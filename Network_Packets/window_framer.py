@@ -88,7 +88,7 @@ class Framer:
                     self._handle_ack(ack_obj)
 
         # FIXED: Use 'socket.timeout' instead of 'self.socket.timeout'
-        except (BlockingIOError, socket.timeout):
+        except (BlockingIOError, socket.timeout()):
             pass
 
     def _handle_ack(self, ack_obj):
