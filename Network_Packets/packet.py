@@ -44,6 +44,25 @@ class HandshakePacket(Packet):
             json_dict.get('dynamic_size')
         )
 
+class HandshakeAckPacket(Packet):
+    def __init__(self, flag: PacketType):
+        super().__init__(flag)
+
+    def return_dict(self) -> dict:
+        data = {
+            "flag": self.flag.value
+        }
+        return data
+
+    def to_bytes(self) -> bytes:
+        return (json.dumps(self.return_dict()) + "\n").encode('utf-8')
+
+    @staticmethod
+    def json_to_packet(json_dict: dict):
+        return HandshakeAckPacket(
+            json_dict.get('flag')
+        )
+
 class DataPacket(Packet):
     def __init__(self, flag: PacketType, sequence: int, payload: str):
         super().__init__(flag)

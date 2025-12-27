@@ -1,6 +1,7 @@
 import time
 import select
 import json
+import socket  # <--- Added import
 from typing import List
 from Network_Packets.packet import DataPacket, AckPacket, PacketType
 
@@ -9,7 +10,7 @@ class Framer:
     def __init__(self, socket_obj, raw_message: str, initial_payload: List[str], window_size: int, msg_size: int,
                  timeout: int, is_dynamic: bool):
         self.socket = socket_obj
-        self.raw_message = raw_message  # Keep full text to allow re-slicing
+        self.raw_message = raw_message
         self.payload = initial_payload
 
         self.window_size = window_size
@@ -22,6 +23,9 @@ class Framer:
         self.last_ack_time = time.time()
         self.last_ack_seq = None
         self.dup_ack_count = 0
+
+        # NEW: Track actual byte position in raw message
+        self.byte_position = 0
 
         self.drop_seq = 1
         self._dropped_once = False
@@ -69,8 +73,7 @@ class Framer:
             chunk = self.socket.recv(4096).decode('utf-8')
             if not chunk: return
 
-            # Handle multiple JSON objects stuck together (e.g. "}{")
-            # We assume your Packet.to_bytes() adds a newline "\n" at the end
+            # Handle multiple JSON objects stuck together
             messages = chunk.split('\n')
 
             for msg in messages:
@@ -83,25 +86,30 @@ class Framer:
                 if p_dict.get('flag') == PacketType.ACK.value:
                     ack_obj = AckPacket.json_to_packet(p_dict)
                     self._handle_ack(ack_obj)
-        except (BlockingIOError, self.socket.timeout):
+
+        # FIXED: Use 'socket.timeout' instead of 'self.socket.timeout'
+        except (BlockingIOError, socket.timeout):
             pass
 
     def _handle_ack(self, ack_obj):
         cum_ack = int(ack_obj.ack)
 
-        # --- DYNAMIC RE-SLICING LOGIC ---
-        # If server requested a new block size, we re-slice the remaining text
+        if cum_ack >= self.frame_cursor:
+            # Update byte position for all newly ACKed packets
+            for i in range(self.frame_cursor, cum_ack + 1):
+                if i < len(self.payload):
+                    self.byte_position += len(self.payload[i])
+
+            self.frame_cursor = cum_ack + 1
+            self.last_ack_time = time.time()
+
+        # --- DYNAMIC RE-SLICING LOGIC (MOVED AFTER byte_position update) ---
         if self.is_dynamic and ack_obj.new_block_size is not None:
             new_size = int(ack_obj.new_block_size)
             if new_size != self.msg_size:
                 print(f"[Framer] Dynamic Update: Changing Message Size {self.msg_size} -> {new_size}")
                 self._reslice_payload(new_size)
         # --------------------------------
-
-        # Slide Window
-        if cum_ack >= self.frame_cursor:
-            self.frame_cursor = cum_ack + 1
-            self.last_ack_time = time.time()
 
         # Fast Retransmit Logic
         if self.last_ack_seq == cum_ack:
@@ -121,30 +129,24 @@ class Framer:
     def _reslice_payload(self, new_chunk_size):
         """
         Re-calculates the payload list based on the new chunk size.
-        Only re-slices the data that hasn't been ACKed yet.
+        Uses byte_position tracker which must be updated BEFORE this is called.
         """
-        # 1. Calculate how much text was already ACKed (sent successfully)
-        # We sum the lengths of packets 0 to frame_cursor-1
-        finished_text_len = sum(len(segment) for segment in self.payload[:self.frame_cursor])
+        # 1. Get remaining raw text using tracked byte position
+        remaining_text = self.raw_message[self.byte_position:]
 
-        # 2. Get the remaining raw text
-        remaining_text = self.raw_message[finished_text_len:]
-
-        # 3. Slice the remaining text with the NEW size
+        # 2. Slice the remaining text with the NEW size
         new_chunks = [remaining_text[i:i + new_chunk_size] for i in range(0, len(remaining_text), new_chunk_size)]
 
-        # 4. Construct new payload list: [Old Packet 0, Old Packet 1, ... New Packet X, New Packet Y]
+        # 3. Construct new payload list: keep ACKed packets, replace rest
         self.payload = self.payload[:self.frame_cursor] + new_chunks
 
-        # 5. Update state
+        # 4. Update state
         self.msg_size = new_chunk_size
 
-        # 6. Reset sequence_tracker to frame_cursor
-        # We must re-send the current window because the packet at 'frame_cursor'
-        # has likely changed its content (it's now a different slice).
+        # 5. Reset sequence_tracker to frame_cursor
         self.sequence_tracker = self.frame_cursor
 
-        print(f"[Framer] Re-sliced! Remaining segments count: {len(new_chunks)}")
+        print(f"[Framer] Re-sliced! Remaining segments count: {len(new_chunks)}, Byte position: {self.byte_position}")
 
     def _dispatch(self, packet_obj):
         self.socket.sendall(packet_obj.to_bytes())

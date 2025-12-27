@@ -6,7 +6,7 @@ from typing import List
 from Utils.configuration import ConnectionConfig
 from Utils.config_writer import FileConfiger
 from Utils.file_handler import FileHandler
-from Network_Packets.packet import HandshakePacket, AckPacket, FinPacket, PacketType
+from Network_Packets.packet import HandshakePacket, AckPacket, FinPacket, PacketType, HandshakeAckPacket
 from Network_Packets.window_framer import Framer
 
 
@@ -88,7 +88,7 @@ class DataEmitter:
 
         self.payload_segments = self._harvest_and_slice(self.effective_msg_size)
 
-        self._dispatch_unit(AckPacket(PacketType.ACK, 0))
+        self._dispatch_unit(HandshakeAckPacket(PacketType.ACK))
         print("[Emitter] Connection Established.")
 
     def execute_transfer(self):
@@ -110,7 +110,7 @@ class DataEmitter:
         print("[Emitter] Initiating Teardown.")
         self._dispatch_unit(FinPacket(PacketType.FIN))
         self._await_specific_packet(PacketType.FINACK)
-        self._dispatch_unit(AckPacket(PacketType.ACK, 0))
+        self._dispatch_unit(HandshakeAckPacket(PacketType.ACK))
         print("[Emitter] Closed.")
         self.link_socket.close()
 
