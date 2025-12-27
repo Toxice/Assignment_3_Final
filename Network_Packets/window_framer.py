@@ -15,7 +15,7 @@ class Framer:
 
         self.window_size = window_size
         self.msg_size = msg_size
-        self.timeout = timeout
+        self.timeout = float(timeout)
         self.is_dynamic = is_dynamic
 
         self.frame_cursor = 0
@@ -38,12 +38,12 @@ class Framer:
             self._send_available_frames()
 
             # 2. LISTEN
-            readable, _, _ = select.select([self.socket], [], [], 0.1)
+            readable, _, _ = select.select([self.socket], [], [], self.timeout)
             if readable:
                 self._process_incoming_acks()
 
             # 3. TIMEOUT
-            if time.time() - self.last_ack_time > self.timeout:
+            if time.time() - self.last_ack_time > (self.timeout / 1000.0):
                 print(f"[Framer] TIMEOUT! Retransmitting from base {self.frame_cursor}")
                 # Reset tracker to base to re-send the whole window
                 self.sequence_tracker = self.frame_cursor
@@ -88,7 +88,7 @@ class Framer:
                     self._handle_ack(ack_obj)
 
         # FIXED: Use 'socket.timeout' instead of 'self.socket.timeout'
-        except (BlockingIOError, socket.timeout()):
+        except (BlockingIOError, socket.timeout):
             pass
 
     def _handle_ack(self, ack_obj):
