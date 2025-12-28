@@ -1,7 +1,7 @@
-Reliable JSON Transfer Protocol (RJTP)
-A Python implementation of a reliable, TCP-like data transfer protocol running on top of standard sockets. This project simulates core networking concepts—including sliding windows, flow control, fast retransmit, and connection handshakes—using JSON-formatted packets.
+Reliable JSON Transfer Protocol
+A Python implementation of a reliable, TCP-like data transfer protocol running on top of TCP sockets. This project simulates core networking concepts—including sliding windows, flow control, fast retransmit, and connection handshakes—using JSON-formatted packets.
 
-🚀 Features
+Features
 Reliable Data Transfer: Ensures data delivery using Sequence Numbers and Acknowledgments (ACKs).
 
 3-Way Handshake: Establishes connections using SYN, SYN/ACK, and ACK packets.
@@ -18,7 +18,7 @@ Dynamic Message Sizing: A unique feature where the receiver (Server) can instruc
 
 Graceful Teardown: Closes connections cleanly using FIN/ACK packets.
 
-📂 Project Structure
+Project Structure
 To run this code successfully, ensure your directory structure matches the Python imports:
 
 Plaintext
@@ -38,7 +38,7 @@ Plaintext
     ├── config_writer.py     # Writes manual configs
     └── file_handler.py      # Reads raw file data
 ```
-⚙️ Configuration
+Configuration
 The system uses a configuration file (default config.txt) to set protocol parameters.
 
 Format (config.txt):
@@ -60,7 +60,7 @@ timeout: Time (in milliseconds) before retransmission.
 
 dynamic_message_size: True/False. If True, the server may request chunk size changes.
 
-🔧 Installation & Usage
+Installation & Usage
 1. Prerequisites
 Python 3.x
 
@@ -69,22 +69,23 @@ No external pip dependencies required (uses standard socket, json, select, time)
 2. Setup
 Create the required source file (the message to be sent):
 
-Bash
 
-echo "This is a test message to simulate TCP transfer." > message.txt
+```
+message.txt
+```
 3. Running the Server
 Start the receiver first. It will listen for incoming connections.
 
-Bash
+
 ```
-python server.py -port 5555
+python server.py
 ```
 Note: Port defaults to 5555 if not specified.
+If you want to use a different Port or IP address use the flags --host and --port
 
 4. Running the Client
 Start the sender in a separate terminal.
 
-Bash
 ```
 python client.py
 ```
@@ -94,13 +95,24 @@ Config from file: Loads settings from config.txt.
 
 Config manually: Allows you to type parameters (Window Size, Timeout, etc.) in the terminal.
 
-🧠 Technical Details
+Technical Details
 Packet Structure
 All data is transferred as JSON strings terminated by a newline (\n).
 
+Example Handshake Packet(SYN/SYN-ACK):
+
+```jsonc
+{
+"flag": "SYN",
+"window_size": 5,
+"maximum_msg_size": 3,
+"timeout": 2,
+"dynamic_size": "True"
+}
+```
+
 Example Data Packet (PUSH):
 
-JSON
 ```jsonc
 {
   "flag": "PUSH",
@@ -110,7 +122,6 @@ JSON
 ```
 Example ACK Packet:
 
-JSON
 ```jsonc
 {
   "flag": "ACK",
@@ -126,8 +137,3 @@ The server.py randomly decides to change the block size (e.g., to simulate chang
 It attaches a new_block_size field to an ACK packet.
 
 The window_framer.py on the client receives this, calculates the remaining raw text, and re-slices the remaining payload into new chunk sizes on the fly.
-
-🤝 Contributing
-Feel free to fork this project and submit pull requests. Suggestions for implementing congestion control (like TCP Tahoe/Reno) are welcome.
-
-Internal Reasoning for the User: I have organized the README to highlight the "Dynamic Sizing" feature, as that is the most complex and unique part of your implementation. I also inferred the directory structure (Network_Packets and Utils) based on the import statements found in client.py, as the code will not run without those folders existing.
