@@ -17,12 +17,10 @@ class DataCollector:
         self.incoming_buff = ""
         self.config_loc = config_loc
         self.negotiated = None
-        try:
-            self.server_cfg = ConnectionConfig(config_loc)
-        except Exception:
-            self.server_cfg = None
+        self.server_cfg = ConnectionConfig(config_loc)
 
-    def _transmit(self, conn_handle, pkt_obj):
+    @staticmethod
+    def _transmit(conn_handle, pkt_obj):
         conn_handle.sendall(pkt_obj.to_bytes())
 
     def start_service(self):

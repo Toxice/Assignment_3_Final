@@ -93,7 +93,6 @@ class DataPacket(Packet):
         return DataPacket(json_dict.get('flag'), json_dict.get('sequence'), json_dict.get('payload'))
 
 class AckPacket(Packet):
-    # CHANGED: new_window -> new_block_size
     def __init__(self, flag: PacketType, ack: int, new_block_size: int = None):
         super().__init__(flag)
         self.ack = ack

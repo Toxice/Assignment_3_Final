@@ -1,7 +1,7 @@
 import time
 import select
 import json
-import socket  # <--- Added import
+import socket
 from typing import List
 from Network_Packets.packet import DataPacket, AckPacket, PacketType
 
@@ -24,7 +24,6 @@ class Framer:
         self.last_ack_seq = None
         self.dup_ack_count = 0
 
-        # NEW: Track actual byte position in raw message
         self.byte_position = 0
 
         self.drop_seq = 1
@@ -64,7 +63,7 @@ class Framer:
                 continue
 
             seg_pkt = DataPacket(PacketType.PUSH, idx, self.payload[idx])
-            self._dispatch(seg_pkt)
+            self.send_packet(seg_pkt)
             print(f"[Framer] Pushed Segment {idx} (Msg Size: {len(self.payload[idx])})")
             self.sequence_tracker += 1
 
@@ -73,7 +72,7 @@ class Framer:
             chunk = self.socket.recv(4096).decode('utf-8')
             if not chunk: return
 
-            # Handle multiple JSON objects stuck together
+            # parsing multiple responses with the "\n" sign
             messages = chunk.split('\n')
 
             for msg in messages:
@@ -87,7 +86,7 @@ class Framer:
                     ack_obj = AckPacket.json_to_packet(p_dict)
                     self._handle_ack(ack_obj)
 
-        # FIXED: Use 'socket.timeout' instead of 'self.socket.timeout'
+
         except (BlockingIOError, socket.timeout):
             pass
 
@@ -103,7 +102,7 @@ class Framer:
             self.frame_cursor = cum_ack + 1
             self.last_ack_time = time.time()
 
-        # --- DYNAMIC RE-SLICING LOGIC (MOVED AFTER byte_position update) ---
+        # --- DYNAMIC RE-SLICING LOGIC
         if self.is_dynamic and ack_obj.new_block_size is not None:
             new_size = int(ack_obj.new_block_size)
             if new_size != self.msg_size:
@@ -123,7 +122,7 @@ class Framer:
             missing = self.frame_cursor
             if missing < len(self.payload):
                 pkt = DataPacket(PacketType.PUSH, missing, self.payload[missing])
-                self._dispatch(pkt)
+                self.send_packet(pkt)
                 self.dup_ack_count = 0
 
     def _reslice_payload(self, new_chunk_size):
@@ -148,5 +147,5 @@ class Framer:
 
         print(f"[Framer] Re-sliced! Remaining segments count: {len(new_chunks)}, Byte position: {self.byte_position}")
 
-    def _dispatch(self, packet_obj):
+    def send_packet(self, packet_obj):
         self.socket.sendall(packet_obj.to_bytes())

@@ -64,6 +64,8 @@ class DataEmitter:
     def initiate_link(self):
         print("[Emitter] Dialing target...")
         self.link_socket.connect((self.dest_addr, self.dest_port))
+        # new line
+        #self.link_socket.settimeout(self.proposed_timeout)
 
         syn = HandshakePacket(PacketType.SYN, self.proposed_window, self.proposed_msg_size, self.proposed_timeout,
                               self.proposed_dynamic)
@@ -84,7 +86,10 @@ class DataEmitter:
         self.effective_dynamic = self.proposed_dynamic and server_dyn
 
         print(
-            f"[Emitter] Negotiated: Win={self.effective_window}, Msg={self.effective_msg_size}, Timeout={self.effective_timeout}, Dyn={self.effective_dynamic}")
+            f"[Emitter] Negotiated: Win={self.effective_window},"
+            f" Msg={self.effective_msg_size},"
+            f" Timeout={self.effective_timeout},"
+            f" Dyn={self.effective_dynamic}")
 
         self.payload_segments = self._harvest_and_slice(self.effective_msg_size)
 
@@ -112,7 +117,6 @@ class DataEmitter:
         self._await_specific_packet(PacketType.FINACK)
         self._dispatch_unit(HandshakeAckPacket(PacketType.ACK))
         print("[Emitter] Closed.")
-        self.link_socket.close()
 
 
 if __name__ == "__main__":
